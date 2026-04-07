@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Waterbody GIS Dashboard</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <!-- Marker Cluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
+
+    <!-- Icons (for search icon) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <link rel="stylesheet" href="style.css"/>
+</head>
+
+<body>
+
+<div id="container">
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+
+        <h2>Filters</h2>
+
+        <label>District</label>
+        <select id="districtFilter">
+            <option value="All">All Districts</option>
+        </select>
+
+        <label>Waterbody Type</label>
+        <select id="typeFilter">
+            <option value="All">All Types</option>
+            <option value="Pond">Pond</option>
+            <option value="Lake">Lake</option>
+            <option value="Tank">Tank</option>
+            <option value="Reservoir">Reservoir</option>
+            <option value="Check Dam">Check Dam</option>
+        </select>
+
+        <hr>
+
+        <h3>Tools</h3>
+
+        <label>
+            <input type="checkbox" id="heatToggle"> Heatmap
+        </label>
+
+        <!-- SEARCH BAR -->
+        <div class="search-container">
+            <i class="fa fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search waterbody..." />
+        </div>
+
+        <button onclick="searchWaterbody()">Search</button>
+
+        <hr>
+
+        <h3>
+            <input type="checkbox" id="legendToggle" checked> Legend
+        </h3>
+
+        <div id="legendBox" class="legend">
+            <p><img src="assets/icons/pond.png"> Pond</p>
+            <p><img src="assets/icons/lake.png"> Lake</p>
+            <p><img src="assets/icons/tank.png"> Tank</p>
+            <p><img src="assets/icons/dam.png"> Reservoir</p>
+            <p><img src="assets/icons/checkdam.png"> Check Dam</p>
+        </div>
+
+    </div>
+
+    <!-- MAP -->
+    <div id="map"></div>
+
+</div>
+
+<!-- JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script src="script.js"></script>
+
+</body>
+</html>
