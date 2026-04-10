@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
 
-    <!-- Icons (for search icon) -->
+    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <link rel="stylesheet" href="style.css"/>
@@ -20,8 +20,18 @@
 
 <div id="container">
 
-    <!-- SIDEBAR -->
+    <!-- Toggle Button -->
+    <div id="toggleBtn">❮</div>
+
+    <!-- Sidebar -->
     <div id="sidebar">
+
+        <h2>Analytics</h2>
+        <p>Total: <span id="totalCount">0</span></p>
+        <p>Ponds: <span id="pondCount">0</span></p>
+        <p>Lakes: <span id="lakeCount">0</span></p>
+
+        <hr>
 
         <h2>Filters</h2>
 
@@ -48,11 +58,13 @@
             <input type="checkbox" id="heatToggle"> Heatmap
         </label>
 
-        <!-- SEARCH BAR -->
+        <!-- Search -->
         <div class="search-container">
             <i class="fa fa-search"></i>
             <input type="text" id="searchInput" placeholder="Search waterbody..." />
         </div>
+
+        <div id="suggestions"></div>
 
         <button onclick="searchWaterbody()">Search</button>
 
@@ -72,7 +84,7 @@
 
     </div>
 
-    <!-- MAP -->
+    <!-- Map -->
     <div id="map"></div>
 
 </div>

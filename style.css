@@ -4,7 +4,6 @@ html, body {
     font-family: Arial, sans-serif;
 }
 
-/* Layout */
 #container {
     display: flex;
     height: 100vh;
@@ -17,15 +16,31 @@ html, body {
     color: white;
     padding: 15px;
     overflow-y: auto;
+    transition: 0.3s;
 }
 
-/* Filters */
-#sidebar label {
-    display: block;
-    margin-top: 10px;
-    font-size: 14px;
+/* Collapse */
+#sidebar.collapsed {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
+/* Toggle button */
+#toggleBtn {
+    position: absolute;
+    top: 50%;
+    left: 310px;
+    transform: translateY(-50%);
+    background: #2563eb;
+    color: white;
+    padding: 10px;
+    cursor: pointer;
+    z-index: 1000;
+    border-radius: 0 5px 5px 0;
+}
+
+/* Inputs */
 #sidebar select {
     width: 100%;
     padding: 6px;
@@ -40,26 +55,43 @@ hr {
     border: 0.5px solid #374151;
 }
 
-/* SEARCH BAR DESIGN */
+/* Search */
 .search-container {
     position: relative;
     margin-top: 10px;
 }
 
 .search-container input {
-    width: 87%;
-    padding: 10px 10px 10px 25px;
+    width: 85%;
+    padding: 10px 10px 10px 35px;
     border-radius: 25px;
     border: none;
     outline: none;
-    font-size: 14px;
 }
 
 .search-container i {
     position: absolute;
     top: 10px;
-    left: 250px;
-    color: #6b7280;
+    left: 10px;
+    color: gray;
+}
+
+/* Suggestions */
+#suggestions {
+    background: white;
+    color: black;
+    max-height: 120px;
+    overflow-y: auto;
+    border-radius: 5px;
+}
+
+#suggestions div {
+    padding: 5px;
+    cursor: pointer;
+}
+
+#suggestions div:hover {
+    background: #ddd;
 }
 
 /* Button */
@@ -71,24 +103,9 @@ button {
     background: #2563eb;
     color: white;
     border-radius: 20px;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #1e40af;
 }
 
 /* Legend */
-.legend {
-    margin-top: 10px;
-}
-
-.legend p {
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-}
-
 .legend img {
     width: 20px;
     margin-right: 8px;
