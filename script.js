@@ -1,61 +1,61 @@
 console.log("Dashboard loaded");
 
-// Map
+// ================= MAP =================
 var map = L.map('map').setView([13.0827, 80.2707], 10);
 
-// Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Globals
+// ================= GLOBALS =================
 var geojsonData;
 var currentLayer;
 var heatLayer;
 var districtLayer;
+var renderId = 0; // 🔥 used to cancel old batches
 
-// ================= ICONS (UPDATED TO MATCH DATASET) =================
+// ================= CONFIG =================
+const BATCH_SIZE = 1000;
+const BATCH_DELAY = 30;
 
+// ================= DOM FIX =================
+const legendBox = document.getElementById("legendBox");
+
+// ================= NORMALIZE =================
+function normalize(value) {
+    return (value || "").toString().trim().toLowerCase();
+}
+
+// ================= ICONS =================
 var icons = {
-    "Ponds": L.icon({ iconUrl: 'assets/icons/Ponds.png', iconSize: [28, 28] }),
-    "Lakes": L.icon({ iconUrl: 'assets/icons/Lakes.png', iconSize: [28, 28] }),
-    "Tank": L.icon({ iconUrl: 'assets/icons/Tank.png', iconSize: [28, 28] }),
-    "Reservoir": L.icon({ iconUrl: 'assets/icons/Reservoir.png', iconSize: [28, 28] }),
-
-    // special case (long dataset value)
+    "ponds": L.icon({ iconUrl: 'assets/icons/Ponds.png', iconSize: [28, 28] }),
+    "lakes": L.icon({ iconUrl: 'assets/icons/Lakes.png', iconSize: [28, 28] }),
+    "tank": L.icon({ iconUrl: 'assets/icons/Tank.png', iconSize: [28, 28] }),
+    "reservoir": L.icon({ iconUrl: 'assets/icons/Reservoir.png', iconSize: [28, 28] }),
     "checkdam": L.icon({ iconUrl: 'assets/icons/checkdam.png', iconSize: [28, 28] }),
-
-    "Others": L.icon({ iconUrl: 'assets/icons/default.png', iconSize: [28, 28] })
+    "others": L.icon({ iconUrl: 'assets/icons/default.png', iconSize: [28, 28] })
 };
 
-// ================= LOAD DATA =================
-
+// ================= LOAD =================
 fetch('./data/cleaned_waterbodies.geojson')
 .then(res => res.json())
 .then(data => {
     geojsonData = data;
     populateDistricts();
     renderLayer();
-    updateAnalytics();
 });
 
-// DISTRICT BOUNDARIES
+// ================= DISTRICT =================
 fetch('./data/districts.geojson')
 .then(res => res.json())
 .then(data => {
     districtLayer = L.geoJSON(data, {
-        style: {
-            color: "#555",
-            weight: 1,
-            fillOpacity: 0
-        }
+        style: { color: "#555", weight: 1, fillOpacity: 0 }
     }).addTo(map);
 });
 
 // ================= DROPDOWN =================
-
 function populateDistricts() {
-
     let districts = new Set();
 
     geojsonData.features.forEach(f => {
@@ -74,88 +74,161 @@ function populateDistricts() {
     });
 }
 
-// ================= RENDER =================
+// ================= HEATMAP =================
+function createHeatmap(data) {
 
-function renderLayer() {
+    let points = data.map(f => [
+        f.geometry.coordinates[1],
+        f.geometry.coordinates[0],
+        1
+    ]);
 
-    let selectedDistrict = districtFilter.value.trim();
-    let selectedType = typeFilter.value.trim();
+    if (heatLayer) map.removeLayer(heatLayer);
 
-    if (currentLayer) {
-        map.removeLayer(currentLayer);
+    heatLayer = L.heatLayer(points, { radius: 25 });
+
+    if (heatToggle.checked) {
+        map.addLayer(heatLayer);
     }
-
-    let cluster = L.markerClusterGroup();
-
-    let layer = L.geoJSON(geojsonData, {
-
-        filter: function(feature) {
-
-            let fDistrict = (feature.properties.district || "").trim();
-
-            let rawType =
-                feature.properties.ref_water_body_type_id_name ||
-                feature.properties.type || "";
-
-            let fType = rawType.trim();
-
-            let matchDistrict =
-                selectedDistrict === "All" || fDistrict === selectedDistrict;
-
-            let matchType =
-                selectedType === "All" || fType === selectedType;
-
-            return matchDistrict && matchType;
-        },
-
-        pointToLayer: function(feature, latlng) {
-
-            let rawType =
-                feature.properties.ref_water_body_type_id_name ||
-                feature.properties.type || "";
-
-            let iconKey;
-
-            // HANDLE SPECIAL CASE
-            if (rawType.toLowerCase().includes("check") ||
-                rawType.toLowerCase().includes("dam")) {
-
-                iconKey = "checkdam";
-
-            } else {
-
-                iconKey = rawType.trim();
-            }
-
-            return L.marker(latlng, {
-                icon: icons[iconKey] || icons["Others"]
-            });
-        },
-
-        onEachFeature: function(feature, layer) {
-
-            let p = feature.properties;
-
-            layer.bindPopup(`
-                <b>${p.name || p.water_body_name || "N/A"}</b><br>
-                Type: ${p.ref_water_body_type_id_name || p.type || "N/A"}<br>
-                District: ${p.district || "N/A"}<br>
-                State: ${p.state || "N/A"}<br>
-                Lat: ${feature.geometry.coordinates[1]}<br>
-                Lon: ${feature.geometry.coordinates[0]}
-            `);
-        }
-
-    });
-
-    cluster.addLayer(layer);
-    currentLayer = cluster;
-
-    map.addLayer(currentLayer);
 }
 
-// ================= DISTRICT ZOOM =================
+// ================= RENDER =================
+function renderLayer() {
 
+    renderId++; // 🔥 invalidate old batches
+    let currentRender = renderId;
+
+    let selectedDistrict = districtFilter.value;
+    let selectedType = typeFilter.value;
+
+    if (currentLayer) map.removeLayer(currentLayer);
+
+    let cluster = L.markerClusterGroup({
+        chunkedLoading: true,
+        chunkInterval: 300,
+        chunkDelay: 80
+    });
+
+    let filtered = geojsonData.features.filter(f => {
+
+        let d = normalize(f.properties.district);
+
+        let rawType =
+            f.properties.ref_water_body_type_id_name ||
+            f.properties.type || "";
+
+        let t = normalize(rawType);
+
+        return (
+            (normalize(selectedDistrict) === "all" || d === normalize(selectedDistrict)) &&
+            (normalize(selectedType) === "all" || t.includes(normalize(selectedType)))
+        );
+    });
+
+    updateAnalytics(filtered);
+    createHeatmap(filtered); // 🔥 FIXED
+
+    let index = 0;
+
+    function processBatch() {
+
+        // 🔥 STOP OLD RENDER
+        if (currentRender !== renderId) return;
+
+        let batch = filtered.slice(index, index + BATCH_SIZE);
+
+        batch.forEach(feature => {
+
+            let lat = feature.geometry.coordinates[1];
+            let lon = feature.geometry.coordinates[0];
+
+            let t = normalize(
+                feature.properties.ref_water_body_type_id_name ||
+                feature.properties.type
+            );
+
+            let iconKey = "others";
+
+            if (t.includes("pond")) iconKey = "ponds";
+            else if (t.includes("lake")) iconKey = "lakes";
+            else if (t.includes("tank")) iconKey = "tank";
+            else if (t.includes("reservoir")) iconKey = "reservoir";
+            else if (t.includes("check") || t.includes("dam")) iconKey = "checkdam";
+
+            let marker = L.marker([lat, lon], {
+                icon: icons[iconKey]
+            });
+
+            marker.on('click', function () {
+                let p = feature.properties;
+
+                this.bindPopup(`
+                    <b>${p.name || p.water_body_name || "N/A"}</b><br>
+                    Type: ${p.ref_water_body_type_id_name || p.type || "N/A"}<br>
+                    District: ${p.district || "N/A"}
+                `).openPopup();
+            });
+
+            cluster.addLayer(marker);
+        });
+
+        index += BATCH_SIZE;
+
+        if (index < filtered.length) {
+            setTimeout(processBatch, BATCH_DELAY);
+        }
+    }
+
+    processBatch();
+
+    currentLayer = cluster;
+    map.addLayer(cluster);
+}
+
+// ================= ANALYTICS =================
+function updateAnalytics(data) {
+
+    totalCount.innerText = data.length;
+
+    let ponds = 0, lakes = 0;
+
+    data.forEach(f => {
+        let t = normalize(
+            f.properties.ref_water_body_type_id_name ||
+            f.properties.type
+        );
+
+        if (t.includes("pond")) ponds++;
+        if (t.includes("lake")) lakes++;
+    });
+
+    pondCount.innerText = ponds;
+    lakeCount.innerText = lakes;
+}
+
+// ================= FILTER EVENTS =================
+districtFilter.onchange = function () {
+    if (this.value !== "All") zoomToDistrict(this.value);
+    renderLayer();
+};
+
+typeFilter.onchange = renderLayer;
+
+// ================= HEAT TOGGLE =================
+heatToggle.onchange = function () {
+    if (this.checked && heatLayer) {
+        map.addLayer(heatLayer);
+    } else if (heatLayer) {
+        map.removeLayer(heatLayer);
+    }
+};
+
+// ================= LEGEND FIX =================
+legendToggle.onchange = function () {
+    legendBox.style.display = this.checked ? "block" : "none";
+};
+
+// ================= DISTRICT ZOOM =================
 function zoomToDistrict(name) {
 
     if (!districtLayer) return;
@@ -184,156 +257,3 @@ function zoomToDistrict(name) {
         }
     });
 }
-
-// ================= FILTER EVENTS =================
-
-districtFilter.onchange = function() {
-
-    let d = this.value.trim();
-
-    if (d !== "All") {
-        zoomToDistrict(d);
-    }
-
-    renderLayer();
-};
-
-typeFilter.onchange = renderLayer;
-
-// ================= SEARCH =================
-
-function searchWaterbody() {
-
-    let input = searchInput.value.trim();
-
-    // LAT,LON search
-    if (input.includes(",")) {
-
-        let parts = input.split(",");
-        let lat = parseFloat(parts[0]);
-        let lon = parseFloat(parts[1]);
-
-        if (!isNaN(lat) && !isNaN(lon)) {
-            map.flyTo([lat, lon], 15);
-            return;
-        }
-    }
-
-    // NAME search
-    let found = geojsonData.features.find(f =>
-        (f.properties.name || f.properties.water_body_name || "")
-        .toLowerCase().includes(input.toLowerCase())
-    );
-
-    if (found) {
-
-        let lat = found.geometry.coordinates[1];
-        let lon = found.geometry.coordinates[0];
-
-        map.flyTo([lat, lon], 15);
-
-    } else {
-        alert("Not found");
-    }
-}
-
-// ================= AUTOSUGGEST =================
-
-searchInput.oninput = function() {
-
-    let val = this.value.toLowerCase();
-    suggestions.innerHTML = "";
-
-    if (!val) return;
-
-    let matches = geojsonData.features.filter(f =>
-        (f.properties.name || f.properties.water_body_name || "")
-        .toLowerCase().includes(val)
-    ).slice(0, 5);
-
-    matches.forEach(m => {
-
-        let div = document.createElement("div");
-        div.textContent = m.properties.name || m.properties.water_body_name;
-
-        div.onclick = function() {
-
-            let lat = m.geometry.coordinates[1];
-            let lon = m.geometry.coordinates[0];
-
-            map.flyTo([lat, lon], 15);
-
-            searchInput.value = div.textContent;
-            suggestions.innerHTML = "";
-        };
-
-        suggestions.appendChild(div);
-    });
-};
-
-// ================= HEATMAP =================
-
-function createHeatmap() {
-
-    let points = geojsonData.features.map(f => [
-        f.geometry.coordinates[1],
-        f.geometry.coordinates[0],
-        1
-    ]);
-
-    heatLayer = L.heatLayer(points);
-}
-
-heatToggle.onchange = function() {
-
-    if (this.checked) {
-        if (!heatLayer) createHeatmap();
-        map.addLayer(heatLayer);
-    } else {
-        if (heatLayer) map.removeLayer(heatLayer);
-    }
-};
-
-// ================= LEGEND =================
-
-legendToggle.onchange = function() {
-    legendBox.style.display = this.checked ? "block" : "none";
-};
-
-// ================= ANALYTICS =================
-
-function updateAnalytics() {
-
-    totalCount.innerText = geojsonData.features.length;
-
-    pondCount.innerText =
-        geojsonData.features.filter(f =>
-            (f.properties.ref_water_body_type_id_name || "")
-            .includes("Pond")
-        ).length;
-
-    lakeCount.innerText =
-        geojsonData.features.filter(f =>
-            (f.properties.ref_water_body_type_id_name || "")
-            .includes("Lake")
-        ).length;
-}
-
-// ================= SIDEBAR =================
-
-let visible = true;
-
-toggleBtn.onclick = function() {
-
-    visible = !visible;
-
-    if (!visible) {
-        sidebar.classList.add("collapsed");
-        this.innerHTML = "❯";
-        this.style.left = "0px";
-    } else {
-        sidebar.classList.remove("collapsed");
-        this.innerHTML = "❮";
-        this.style.left = "310px";
-    }
-};

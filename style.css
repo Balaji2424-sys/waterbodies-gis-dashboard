@@ -115,3 +115,14 @@ button {
 #map {
     flex: 1;
 }
+
+#loader {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    z-index: 2000;
+    font-size: 14px;
+}
